@@ -39,7 +39,7 @@
     <modules>
         <module>spring-batch-common</module>
         <module>task-master</module>
-        <!-- <module>worker-node</module> -->
+        <module>worker-node</module>
     </modules>
 
     <dependencyManagement>

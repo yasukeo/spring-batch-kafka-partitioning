@@ -1,0 +1,191 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    networks:
+      - batch-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_NUM_PARTITIONS: 8
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - batch-network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  task-master:
+    build:
+      context: ../task-master
+      dockerfile: ../docker/Dockerfile.task-master
+    container_name: task-master
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_TOPIC_PARTITIONS=contract-partitions
+      - KAFKA_TOPIC_RESULTS=contract-results
+      - KAFKA_GROUP_MASTER=task-master-group
+      - BATCH_INPUT_DIR=/app/data/input
+      - BATCH_PROCESSED_DIR=/app/data/processed
+      - BATCH_ERROR_DIR=/app/data/error
+      - LOG_FILE=/app/logs/task-master.log
+    volumes:
+      - ./test-data:/app/data/input:ro
+      - batch-processed:/app/data/processed
+      - batch-error:/app/data/error
+      - task-master-logs:/app/logs
+    networks:
+      - batch-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  worker-node-1:
+    build:
+      context: ../worker-node
+      dockerfile: ../docker/Dockerfile.worker-node
+    container_name: worker-node-1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SERVER_PORT=8081
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_TOPIC_PARTITIONS=contract-partitions
+      - KAFKA_TOPIC_RESULTS=contract-results
+      - KAFKA_GROUP_WORKER=worker-group
+      - TEMP_DIR=/tmp/worker-1
+      - LOG_FILE=/app/logs/worker-node-1.log
+      - HOSTNAME=worker-node-1
+    volumes:
+      - worker-1-temp:/tmp/worker-1
+      - worker-1-logs:/app/logs
+    networks:
+      - batch-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  worker-node-2:
+    build:
+      context: ../worker-node
+      dockerfile: ../docker/Dockerfile.worker-node
+    container_name: worker-node-2
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8082:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SERVER_PORT=8081
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_TOPIC_PARTITIONS=contract-partitions
+      - KAFKA_TOPIC_RESULTS=contract-results
+      - KAFKA_GROUP_WORKER=worker-group
+      - TEMP_DIR=/tmp/worker-2
+      - LOG_FILE=/app/logs/worker-node-2.log
+      - HOSTNAME=worker-node-2
+    volumes:
+      - worker-2-temp:/tmp/worker-2
+      - worker-2-logs:/app/logs
+    networks:
+      - batch-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    networks:
+      - batch-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - batch-network
+
+volumes:
+  zookeeper-data:
+  zookeeper-logs:
+  kafka-data:
+  batch-processed:
+  batch-error:
+  task-master-logs:
+  worker-1-temp:
+  worker-1-logs:
+  worker-2-temp:
+  worker-2-logs:
+
+networks:
+  batch-network:
+    driver: bridge
