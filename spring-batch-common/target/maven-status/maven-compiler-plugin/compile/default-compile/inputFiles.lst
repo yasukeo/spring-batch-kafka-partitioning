@@ -1,0 +1,5 @@
+/home/runner/work/spring-batch-kafka-partitioning/spring-batch-kafka-partitioning/spring-batch-common/src/main/java/com/maroctelecom/common/dto/PartitionTaskDTO.java
+/home/runner/work/spring-batch-kafka-partitioning/spring-batch-kafka-partitioning/spring-batch-common/src/main/java/com/maroctelecom/common/model/Contract.java
+/home/runner/work/spring-batch-kafka-partitioning/spring-batch-kafka-partitioning/spring-batch-common/src/main/java/com/maroctelecom/common/dto/ErrorInfo.java
+/home/runner/work/spring-batch-kafka-partitioning/spring-batch-kafka-partitioning/spring-batch-common/src/main/java/com/maroctelecom/common/config/KafkaConfig.java
+/home/runner/work/spring-batch-kafka-partitioning/spring-batch-kafka-partitioning/spring-batch-common/src/main/java/com/maroctelecom/common/dto/TaskResultDTO.java

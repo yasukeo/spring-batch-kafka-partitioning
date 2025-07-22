@@ -1,0 +1,5 @@
+com/maroctelecom/taskmaster/partitioner/FilePartitioner.class
+com/maroctelecom/taskmaster/service/KafkaPartitionSender.class
+com/maroctelecom/taskmaster/listener/ResultListener.class
+com/maroctelecom/taskmaster/listener/ResultListener$JobExecutionResults.class
+com/maroctelecom/taskmaster/application/TaskMasterApplication.class

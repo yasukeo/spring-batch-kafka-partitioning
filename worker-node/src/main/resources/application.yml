@@ -1,0 +1,180 @@
+# Configuration Spring Boot pour Worker Node
+spring:
+  application:
+    name: worker-node
+  
+  # Configuration JSON
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+# Configuration du serveur
+server:
+  port: ${SERVER_PORT:8081}
+
+# Configuration Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,kafka
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Configuration Kafka
+app:
+  kafka:
+    broker:
+      servers: ${KAFKA_BROKERS:localhost:9092}
+      security:
+        protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+    
+    topics:
+      contract-partitions: ${KAFKA_TOPIC_PARTITIONS:contract-partitions}
+      contract-results: ${KAFKA_TOPIC_RESULTS:contract-results}
+      dead-letter: ${KAFKA_TOPIC_DLT:contract-dead-letter}
+      monitoring: ${KAFKA_TOPIC_MONITORING:contract-monitoring}
+      
+    consumer-groups:
+      task-master: ${KAFKA_GROUP_MASTER:task-master-group}
+      worker: ${KAFKA_GROUP_WORKER:worker-group}
+      
+    producer:
+      acks: all
+      retries: 3
+      batch-size: 16384
+      linger-ms: 5
+      compression-type: gzip
+      enable-idempotence: true
+      
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      session-timeout-ms: 30000
+      max-poll-records: 50  # Réduit pour les workers
+      max-poll-interval-ms: 600000  # 10 minutes pour traiter un batch
+      
+    retry:
+      max-attempts: 3
+      initial-interval: 1000
+      multiplier: 2.0
+      max-interval: 30000
+
+# Configuration du traitement
+processing:
+  contract:
+    # Timeout par défaut pour le traitement d'une partition (en secondes)
+    default-timeout-seconds: 300
+    
+    # Taille maximale d'une partition à traiter
+    max-partition-size: 50000
+    
+    # Validation stricte des contrats
+    strict-validation: true
+    
+    # Continuer le traitement même en cas d'erreurs non critiques
+    continue-on-error: true
+    
+    # Nombre maximum d'erreurs tolérées par partition
+    max-errors-per-partition: 1000
+    
+  # Configuration des threads
+  async:
+    core-pool-size: 2
+    max-pool-size: 4
+    queue-capacity: 50
+    thread-name-prefix: Worker-
+
+# Configuration de la validation
+validation:
+  # Validation stricte des formats
+  strict-format-validation: true
+  
+  # Validation des régions marocaines
+  validate-regions: true
+  
+  # Validation des numéros de téléphone marocains
+  validate-phone-numbers: true
+  
+  # Montant maximum autorisé (en DH)
+  max-contract-amount: 1000000
+  
+  # Durée maximum de contrat (en mois)
+  max-contract-duration: 120
+
+# Configuration des fichiers
+files:
+  # Répertoire temporaire pour le traitement
+  temp-directory: ${TEMP_DIR:/tmp/worker}
+  
+  # Encoding des fichiers CSV
+  csv-encoding: UTF-8
+  
+  # Séparateur CSV
+  csv-separator: ","
+  
+  # Taille du buffer de lecture
+  read-buffer-size: 8192
+
+# Configuration de logging
+logging:
+  level:
+    com.maroctelecom: DEBUG
+    org.springframework.kafka: INFO
+    org.apache.kafka: WARN
+    root: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+  file:
+    name: ${LOG_FILE:/tmp/logs/worker-node-${server.port}.log}
+
+# Configuration des métriques
+metrics:
+  enabled: true
+  
+  # Métriques personnalisées
+  custom:
+    # Suivi du débit de traitement
+    track-throughput: true
+    
+    # Suivi de l'utilisation mémoire
+    track-memory: true
+    
+    # Suivi des erreurs par type
+    track-errors-by-type: true
+    
+  # Seuils d'alerte
+  alerts:
+    # Seuil de débit minimum (contrats/seconde)
+    min-throughput: 10.0
+    
+    # Seuil d'utilisation mémoire (%)
+    max-memory-usage: 80.0
+    
+    # Seuil de taux d'erreur (%)
+    max-error-rate: 5.0
+
+# Configuration de santé
+health:
+  # Vérifications de santé personnalisées
+  checks:
+    kafka-connectivity: true
+    file-system-access: true
+    memory-usage: true
+  
+  # Intervalles de vérification (en secondes)
+  check-interval: 30
+  
+  # Timeout des vérifications (en secondes)
+  check-timeout: 10
