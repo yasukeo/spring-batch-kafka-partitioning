@@ -1,0 +1,140 @@
+# Configuration Spring Boot pour Task Master
+spring:
+  application:
+    name: task-master
+  
+  # Configuration de la base de données H2 pour Spring Batch
+  datasource:
+    url: jdbc:h2:mem:batchdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driverClassName: org.h2.Driver
+    username: sa
+    password: 
+    
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        
+  # Configuration Spring Batch
+  batch:
+    initialize-schema: always
+    job:
+      enabled: false # Désactive le démarrage automatique des jobs
+      
+  # Configuration JSON
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+# Configuration du serveur
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+    
+# Configuration Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,batch,kafka
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Configuration Kafka
+app:
+  kafka:
+    broker:
+      servers: ${KAFKA_BROKERS:localhost:9092}
+      security:
+        protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+    
+    topics:
+      contract-partitions: ${KAFKA_TOPIC_PARTITIONS:contract-partitions}
+      contract-results: ${KAFKA_TOPIC_RESULTS:contract-results}
+      dead-letter: ${KAFKA_TOPIC_DLT:contract-dead-letter}
+      monitoring: ${KAFKA_TOPIC_MONITORING:contract-monitoring}
+      
+    consumer-groups:
+      task-master: ${KAFKA_GROUP_MASTER:task-master-group}
+      worker: ${KAFKA_GROUP_WORKER:worker-group}
+      
+    producer:
+      acks: all
+      retries: 3
+      batch-size: 16384
+      linger-ms: 5
+      compression-type: gzip
+      enable-idempotence: true
+      
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      session-timeout-ms: 30000
+      max-poll-records: 100
+      
+    retry:
+      max-attempts: 3
+      initial-interval: 1000
+      multiplier: 2.0
+      max-interval: 30000
+
+# Configuration des jobs
+batch:
+  job:
+    contract-processing:
+      chunk-size: 1000
+      throttle-limit: 10
+      grid-size: ${BATCH_GRID_SIZE:8}
+      timeout-seconds: 300
+      
+  files:
+    input-directory: ${BATCH_INPUT_DIR:/tmp/batch/input}
+    processed-directory: ${BATCH_PROCESSED_DIR:/tmp/batch/processed}
+    error-directory: ${BATCH_ERROR_DIR:/tmp/batch/error}
+
+# Configuration des métriques
+metrics:
+  enabled: true
+  kafka:
+    lag-threshold: 1000
+    throughput-threshold: 100.0
+  
+# Configuration de logging
+logging:
+  level:
+    com.maroctelecom: DEBUG
+    org.springframework.batch: INFO
+    org.springframework.kafka: INFO
+    org.apache.kafka: WARN
+    root: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+  file:
+    name: ${LOG_FILE:/tmp/logs/task-master.log}
+    
+# Configuration des pools de threads
+async:
+  core-pool-size: 4
+  max-pool-size: 8
+  queue-capacity: 100
+  thread-name-prefix: TaskMaster-
